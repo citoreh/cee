@@ -431,35 +431,77 @@
             const error = document.getElementById('error');
             const grid = document.getElementById('grid');
             
-            try {
-                // Using a CORS proxy to fetch the CSV data
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(CSV_URL);
-                const response = await fetch(proxyUrl);
-                
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+            // Try multiple CORS proxies and methods
+            const proxies = [
+                'https://api.allorigins.win/raw?url=',
+                'https://corsproxy.io/?',
+                'https://cors-anywhere.herokuapp.com/',
+                '' // Direct attempt (might work in some cases)
+            ];
+            
+            for (let i = 0; i < proxies.length; i++) {
+                try {
+                    loading.textContent = `Loading videos... (Attempt ${i + 1}/${proxies.length})`;
+                    
+                    const proxyUrl = proxies[i] + encodeURIComponent(CSV_URL);
+                    const url = proxies[i] === '' ? CSV_URL : proxyUrl;
+                    
+                    console.log(`Attempting to fetch from: ${url}`);
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'text/csv,text/plain,*/*',
+                        },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const csvText = await response.text();
+                    console.log('CSV data received:', csvText.substring(0, 200) + '...');
+                    
+                    videoData = parseCSV(csvText);
+                    
+                    if (videoData.length === 0) {
+                        throw new Error('No video data found in CSV');
+                    }
+                    
+                    console.log('Parsed video data:', videoData);
+                    
+                    loading.style.display = 'none';
+                    grid.style.display = 'grid';
+                    createVideoCards(videoData);
+                    return; // Success, exit function
+                    
+                } catch (err) {
+                    console.warn(`Proxy ${i + 1} failed:`, err.message);
+                    
+                    // If this is the last attempt, show error
+                    if (i === proxies.length - 1) {
+                        loading.style.display = 'none';
+                        error.style.display = 'block';
+                        error.innerHTML = `
+                            <h3>Unable to load video data</h3>
+                            <p>Tried ${proxies.length} different methods to fetch the data.</p>
+                            <p>You can try:</p>
+                            <ul style="text-align: left; margin: 10px 0;">
+                                <li>Refreshing the page</li>
+                                <li>Checking if the Google Sheets URL is publicly accessible</li>
+                                <li>Trying again in a few minutes</li>
+                            </ul>
+                            <p><small>Last error: ${err.message}</small></p>
+                            <button onclick="loadVideoData()" style="margin-top: 10px; padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Try Again
+                            </button>
+                        `;
+                    }
+                    
+                    // Wait a bit before trying next proxy
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                
-                const csvText = await response.text();
-                videoData = parseCSV(csvText);
-                
-                if (videoData.length === 0) {
-                    throw new Error('No video data found');
-                }
-                
-                loading.style.display = 'none';
-                grid.style.display = 'grid';
-                createVideoCards(videoData);
-                
-            } catch (err) {
-                console.error('Error loading data:', err);
-                loading.style.display = 'none';
-                error.style.display = 'block';
-                error.innerHTML = `
-                    <h3>Unable to load video data</h3>
-                    <p>Please check your internet connection and try refreshing the page.</p>
-                    <p><small>Error: ${err.message}</small></p>
-                `;
             }
         }
 
