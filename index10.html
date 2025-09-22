@@ -374,7 +374,8 @@
                 // Set timeout to hide loading if no events received
                 setTimeout(() => {
                     if (loadingVideo.style.display !== 'none') {
-                        loadingVideo.textContent = 'Video player loaded. Click play to start.';
+                        loadingVideo.style.display = 'none';
+                        console.log('Webtor player should be loaded and visible');
                     }
                 }, 5000);
                 
