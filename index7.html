@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Index</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            margin: 50px 0;
+        }
+
+        .error {
+            text-align: center;
+            color: #ff6b6b;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        .card:hover::before {
+            left: 100%;
+        }
+
+        .card-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover .card-image {
+            transform: scale(1.05);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .card:hover .play-icon {
+            opacity: 1;
+        }
+
+        .play-icon::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 20px solid white;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            margin-left: 4px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        .video-container {
+            position: relative;
+            width: 90%;
+            max-width: 1200px;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: -50px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .loading-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .video-container {
+                width: 95%;
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Video Collection</h1>
+            <p>Click on any video to start streaming</p>
+        </div>
+
+        <div id="loading" class="loading">
+            Loading videos...
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            Failed to load video data. Please check the connection and try again.
+        </div>
+
+        <div id="grid" class="grid" style="display: none;"></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+        <div class="video-container">
+            <button class="close-btn" onclick="closeVideo()">&times;</button>
+            <div id="loading-video" class="loading-video">Loading video...</div>
+            <video id="video-player" class="video-player" controls style="display: none;"></video>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script>
+    
+    <script>
+        let videoData = [];
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSdMKO8Qilrp5WpD7yhGdESsL7mhh8HuTqddqm4XHagZKpxeQSAxoSzSXEm7dDqhEz5PkmBQlzAM8w9/pub?output=csv';
+
+        // Parse CSV data
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const data = [];
+            
+            // Skip header row and parse data
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.trim()) {
+                    // Simple CSV parsing - handles basic cases
+                    const columns = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+                    if (columns.length >= 3) {
+                        data.push({
+                            title: columns[0],
+                            image: columns[1],
+                            magnet: columns[2]
+                        });
+                    }
+                }
+            }
+            
+            return data;
+        }
+
+        // Create video cards
+        function createVideoCards(data) {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            
+            data.forEach((video, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => playVideo(video.magnet);
+                
+                card.innerHTML = `
+                    <div style="position: relative;">
+                        <img src="${video.image}" alt="${video.title}" class="card-image" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjgwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDI4MCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjAwIiBmaWxsPSIjZjBmMGYwIi8+CjxyZWN0IHg9IjExNSIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2NjYyIvPgo8L3N2Zz4K'">
+                        <div class="play-icon"></div>
+                    </div>
+                    <div class="card-title">${video.title}</div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        // Play video function
+        function playVideo(magnetLink) {
+            const overlay = document.getElementById('overlay');
+            const videoContainer = overlay.querySelector('.video-container');
+            const loadingVideo = document.getElementById('loading-video');
+            
+            overlay.classList.add('active');
+            loadingVideo.style.display = 'block';
+            loadingVideo.textContent = 'Initializing video player...';
+            
+            // Clear any existing player
+            const existingPlayer = videoContainer.querySelector('.webtor-player');
+            if (existingPlayer) {
+                existingPlayer.remove();
+            }
+            
+            // Hide the regular video player
+            const videoPlayer = document.getElementById('video-player');
+            if (videoPlayer) {
+                videoPlayer.style.display = 'none';
+            }
+            
+            try {
+                // Create Webtor player container
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'webtor-player';
+                playerDiv.style.width = '100%';
+                playerDiv.style.height = '100%';
+                playerDiv.style.position = 'absolute';
+                playerDiv.style.top = '0';
+                playerDiv.style.left = '0';
+                
+                // Insert after the close button but before loading text
+                videoContainer.insertBefore(playerDiv, loadingVideo);
+                
+                // Wait for Webtor SDK to be available
+                const initWebtor = () => {
+                    if (typeof window.webtor !== 'undefined') {
+                        loadingVideo.textContent = 'Connecting to stream...';
+                        
+                        // Initialize Webtor player
+                        window.webtor(playerDiv, {
+                            magnet: magnetLink,
+                            width: '100%',
+                            height: '100%',
+                            poster: '',
+                            controls: true,
+                            autoplay: true,
+                            on: {
+                                ready: () => {
+                                    console.log('Webtor player ready');
+                                    loadingVideo.style.display = 'none';
+                                },
+                                error: (error) => {
+                                    console.error('Webtor error:', error);
+                                    loadingVideo.textContent = 'Error loading video. Please check the magnet link.';
+                                    loadingVideo.style.display = 'block';
+                                }
+                            }
+                        });
+                    } else {
+                        // Retry if Webtor SDK not loaded yet
+                        setTimeout(initWebtor, 100);
+                    }
+                };
+                
+                initWebtor();
+                
+            } catch (error) {
+                loadingVideo.textContent = 'Error: Unable to initialize video player';
+                loadingVideo.style.display = 'block';
+                console.error('Error playing video:', error);
+            }
+        }
+
+        // Close video function
+        function closeVideo() {
+            const overlay = document.getElementById('overlay');
+            const videoContainer = overlay.querySelector('.video-container');
+            
+            overlay.classList.remove('active');
+            
+            // Clean up Webtor player
+            const existingPlayer = videoContainer.querySelector('.webtor-player');
+            if (existingPlayer) {
+                existingPlayer.remove();
+            }
+            
+            // Reset loading state
+            const loadingVideo = document.getElementById('loading-video');
+            loadingVideo.style.display = 'none';
+            loadingVideo.textContent = 'Loading video...';
+            
+            // Hide regular video player if it exists
+            const videoPlayer = document.getElementById('video-player');
+            if (videoPlayer) {
+                videoPlayer.pause();
+                videoPlayer.src = '';
+            }
+        }
+
+        // Close video on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeVideo();
+            }
+        });
+
+        // Close video on overlay click
+        document.getElementById('overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'overlay') {
+                closeVideo();
+            }
+        });
+
+        // Load data function
+        async function loadVideoData() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const grid = document.getElementById('grid');
+            
+            try {
+                // Using a CORS proxy to fetch the CSV data
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(CSV_URL);
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const csvText = await response.text();
+                videoData = parseCSV(csvText);
+                
+                if (videoData.length === 0) {
+                    throw new Error('No video data found');
+                }
+                
+                loading.style.display = 'none';
+                grid.style.display = 'grid';
+                createVideoCards(videoData);
+                
+            } catch (err) {
+                console.error('Error loading data:', err);
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.innerHTML = `
+                    <h3>Unable to load video data</h3>
+                    <p>Please check your internet connection and try refreshing the page.</p>
+                    <p><small>Error: ${err.message}</small></p>
+                `;
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVideoData();
+        });
+    </script>
+</body>
+</html>
