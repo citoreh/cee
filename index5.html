@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Media Index - Photos & Torrents</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #30a247;
+            margin-bottom: 10px;
+        }
+
+        .debug-console {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .debug-console h3 {
+            margin: 0 0 10px 0;
+            color: #30a247;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-error { color: #ff6b6b; }
+        .log-warn { color: #ffa500; }
+        .log-info { color: #4ecdc4; }
+        .log-success { color: #30a247; }
+
+        .setup-section {
+            background-color: #2a3749;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .setup-section h3 {
+            color: #30a247;
+            margin-top: 0;
+        }
+
+        .torrent-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .torrent-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .torrent-input button {
+            padding: 8px 15px;
+            background-color: #30a247;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .torrent-input button:hover {
+            background-color: #25a03c;
+        }
+
+        .file-input {
+            margin-bottom: 15px;
+        }
+
+        .file-input input[type="file"] {
+            margin-bottom: 10px;
+        }
+
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .media-item {
+            background-color: #2a3749;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .media-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(48, 162, 71, 0.3);
+        }
+
+        .media-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .media-info {
+            padding: 15px;
+        }
+
+        .media-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .media-status {
+            font-size: 12px;
+            color: #30a247;
+        }
+
+        /* Player Modal */
+        .player-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+        }
+
+        .player-modal.active {
+            display: block;
+        }
+
+        .player-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 1200px;
+            background-color: #2a3749;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .player-header {
+            background-color: #154820;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .player-content {
+            padding: 0;
+        }
+
+        /* Player styles from original */
+        #output video {
+            width: 100%;
+        }
+
+        #progressBar {
+            height: 5px;
+            width: 0%;
+            background-color: #35b44f;
+            transition: width .4s ease-in-out;
+        }
+
+        body.is-seed .show-seed {
+            display: inline;
+        }
+
+        body.is-seed .show-leech {
+            display: none;
+        }
+
+        .show-seed {
+            display: none;
+        }
+
+        #status code {
+            font-size: 90%;
+            font-weight: 700;
+            margin-left: 3px;
+            margin-right: 3px;
+            border-bottom: 1px dashed rgba(255,255,255,0.3);
+        }
+
+        #status {
+            color: #fff;
+            font-size: 17px;
+            padding: 5px;
+        }
+
+        a:link, a:visited {
+            color: #30a247;
+            text-decoration: none;
+        }
+
+        .no-files {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+            margin-top: 50px;
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 20px;
+            color: #30a247;
+        }
+
+        .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #30a247;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .sample-torrents {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .sample-torrents h4 {
+            margin: 0 0 10px 0;
+            color: #30a247;
+        }
+
+        .sample-link {
+            display: inline-block;
+            margin: 5px 10px 5px 0;
+            padding: 5px 10px;
+            background-color: #30a247;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .sample-link:hover {
+            background-color: #25a03c;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Media Library</h1>
+        <p>Stream torrents directly in your browser</p>
+    </div>
+
+    <div class="debug-console">
+        <h3>Debug Console</h3>
+        <div id="debugLog"></div>
+    </div>
+
+    <div class="setup-section">
+        <h3>Quick Torrent Streaming</h3>
+        
+        <div class="torrent-input">
+            <input type="text" id="torrentInput" placeholder="Enter magnet link or torrent URL...">
+            <button onclick="streamFromInput()">Stream</button>
+        </div>
+        
+        <div class="file-input">
+            <input type="file" id="torrentFile" accept=".torrent" onchange="streamFromFile()">
+            <label for="torrentFile">Or select a .torrent file from your computer</label>
+        </div>
+
+        <div class="sample-torrents">
+            <h4>Sample Public Domain Videos:</h4>
+            <a href="#" class="sample-link" onclick="streamSample('magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Sintel&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com')">Sintel</a>
+            <a href="#" class="sample-link" onclick="streamSample('magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com')">Big Buck Bunny</a>
+            <a href="#" class="sample-link" onclick="streamSample('magnet:?xt=urn:btih:209c8226b299b308beaf2b9cd3fb49212dbd13ec&dn=Tears+of+Steel&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com')">Tears of Steel</a>
+        </div>
+    </div>
+
+    <div class="media-grid" id="mediaGrid">
+        <!-- Media items will be populated here -->
+    </div>
+
+    <div class="no-files" id="noFiles">
+        <h3>No local media files configured</h3>
+        <p>Use the input above to stream torrents, or configure the mediaFiles array in the script for local files.</p>
+    </div>
+
+    <!-- Player Modal -->
+    <div class="player-modal" id="playerModal">
+        <div class="player-container">
+            <div class="player-header">
+                <h3 id="playerTitle">Streaming...</h3>
+                <button class="close-btn" onclick="closePlayer()">&times;</button>
+            </div>
+            <div class="player-content">
+                <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Loading torrent...</p>
+                </div>
+                <div id="output">
+                    <div id="progressBar"></div>
+                    <!-- The video player will be added here -->
+                </div>
+                <!-- Statistics -->
+                <div id="status">
+                    <div>
+                        <span class="show-leech">Downloading </span>
+                        <span class="show-seed">Seeding </span>
+                        <code>
+                            <a id="torrentLink" href="#">loading...</a>
+                        </code>
+                        <span class="show-leech"> from </span>
+                        <span class="show-seed"> to </span>
+                        <code id="numPeers">0 peers</code>.
+                    </div>
+                    <div>
+                        <code id="downloaded"></code>
+                        of <code id="total"></code>
+                        — <span id="remaining"></span><br/>
+                        &#x2198;<code id="downloadSpeed">0 b/s</code>
+                        / &#x2197;<code id="uploadSpeed">0 b/s</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include WebTorrent -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <!-- Moment for time formatting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+    <script>
+        // Debug logging function
+        function debugLog(message, type = 'info') {
+            const debugLogDiv = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            debugLogDiv.appendChild(logEntry);
+            debugLogDiv.scrollTop = debugLogDiv.scrollHeight;
+            
+            // Also log to console
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // UPDATE THIS ARRAY with your actual media files (optional now)
+        const mediaFiles = [
+             'The Fantastic Four First Steps (2025)',           // This will look for sintel.jpg and sintel.torrent
+            // 'big_buck_bunny',   // This will look for big_buck_bunny.jpg and big_buck_bunny.torrent
+            // 'tears_of_steel'    // Add more items as needed
+        ];
+
+        const mediaFolder = 'media/'; // Adjust path as needed
+        let currentTorrent = null;
+        let client = null;
+
+        // Stream from text input
+        function streamFromInput() {
+            const input = document.getElementById('torrentInput');
+            const torrentId = input.value.trim();
+            
+            if (!torrentId) {
+                alert('Please enter a magnet link or torrent URL');
+                return;
+            }
+            
+            debugLog(`Streaming from input: ${torrentId}`);
+            startTorrentStream(torrentId, 'User Input');
+        }
+
+        // Stream from file upload
+        function streamFromFile() {
+            const fileInput = document.getElementById('torrentFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                return;
+            }
+            
+            debugLog(`Streaming from file: ${file.name}`);
+            startTorrentStream(file, file.name);
+        }
+
+        // Stream sample torrent
+        function streamSample(magnetLink) {
+            debugLog(`Streaming sample: ${magnetLink}`);
+            const name = magnetLink.match(/dn=([^&]+)/)?.[1] || 'Sample';
+            startTorrentStream(magnetLink, decodeURIComponent(name));
+        }
+
+        // Initialize the media grid
+        function initializeMediaGrid() {
+            debugLog('Initializing media grid...');
+            
+            const grid = document.getElementById('mediaGrid');
+            const noFiles = document.getElementById('noFiles');
+
+            if (mediaFiles.length === 0) {
+                debugLog('No local media files configured - using input-only mode');
+                noFiles.style.display = 'block';
+                return;
+            }
+
+            debugLog(`Loading ${mediaFiles.length} local media files`);
+            noFiles.style.display = 'none';
+            
+            mediaFiles.forEach(fileName => {
+                const mediaItem = createMediaItem(fileName);
+                grid.appendChild(mediaItem);
+            });
+            
+            debugLog('Media grid initialized successfully', 'success');
+        }
+
+        // Create media item element
+        function createMediaItem(fileName) {
+            const item = document.createElement('div');
+            item.className = 'media-item';
+            item.onclick = () => playTorrent(fileName);
+
+            const photoPath = `${mediaFolder}${fileName}.jpg`;
+            const torrentPath = `${mediaFolder}${fileName}.torrent`;
+
+            item.innerHTML = `
+                <img src="${photoPath}" alt="${fileName}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNDQ0Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="media-info">
+                    <div class="media-title">${fileName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                    <div class="media-status">Click to stream</div>
+                </div>
+            `;
+
+            debugLog(`Created media item for: ${fileName}`);
+            return item;
+        }
+
+        // Play torrent function (for local files)
+        function playTorrent(fileName) {
+            debugLog(`Attempting to play local torrent: ${fileName}`);
+            const torrentPath = `${mediaFolder}${fileName}.torrent`;
+            startTorrentStream(torrentPath, fileName);
+        }
+
+        // Start torrent streaming (unified function)
+        function startTorrentStream(torrentId, displayName) {
+            debugLog(`Starting torrent stream: ${displayName}`);
+            
+            const modal = document.getElementById('playerModal');
+            const title = document.getElementById('playerTitle');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            
+            title.textContent = `Streaming: ${displayName.replace(/_/g, ' ')}`;
+            modal.classList.add('active');
+            loadingIndicator.style.display = 'block';
+            
+            debugLog(`Modal opened for: ${displayName}`);
+            
+            // Clean up previous torrent
+            if (currentTorrent) {
+                debugLog('Cleaning up previous torrent');
+                currentTorrent.destroy();
+                currentTorrent = null;
+            }
+            
+            if (client) {
+                debugLog('Destroying previous WebTorrent client');
+                client.destroy();
+            }
+            
+            // Clear output
+            const output = document.getElementById('output');
+            const videos = output.querySelectorAll('video');
+            videos.forEach(video => {
+                debugLog('Removing previous video element');
+                video.remove();
+            });
+            
+            // Reset progress bar and stats
+            document.getElementById('progressBar').style.width = '0%';
+            document.body.className = document.body.className.replace(' is-seed', '');
+            
+            // Check if WebTorrent is available
+            if (typeof WebTorrent === 'undefined') {
+                debugLog('WebTorrent library not loaded!', 'error');
+                alert('WebTorrent library failed to load. Please check your internet connection.');
+                closePlayer();
+                return;
+            }
+            
+            debugLog('Initializing WebTorrent client');
+            
+            try {
+                client = new WebTorrent();
+                debugLog('WebTorrent client created successfully', 'success');
+                
+                // Add error handling for client
+                client.on('error', function(err) {
+                    debugLog(`WebTorrent client error: ${err.message}`, 'error');
+                    alert(`WebTorrent error: ${err.message}`);
+                    closePlayer();
+                });
+                
+                // Validate torrent identifier
+                if (typeof torrentId === 'string' && torrentId.trim() === '') {
+                    debugLog('Empty torrent identifier', 'error');
+                    alert('Please provide a valid torrent file, magnet link, or URL');
+                    closePlayer();
+                    return;
+                }
+                
+                debugLog(`Adding torrent with ID: ${typeof torrentId === 'string' ? torrentId.substring(0, 100) + '...' : 'File object'}`);
+                
+                // Add torrent with timeout
+                const addTimeout = setTimeout(() => {
+                    debugLog('Torrent add timeout - this might be a network issue', 'error');
+                    alert('Timeout loading torrent. Please check:\n1. Your internet connection\n2. The torrent is valid\n3. The file path is correct');
+                    closePlayer();
+                }, 30000); // 30 second timeout
+                
+                client.add(torrentId, function (torrent) {
+                    clearTimeout(addTimeout);
+                    debugLog(`Torrent added successfully: ${torrent.name}`, 'success');
+                    loadingIndicator.style.display = 'none';
+                    currentTorrent = torrent;
+
+                    // Update torrent link display
+                    const $torrentLink = document.querySelector('#torrentLink');
+                    if (typeof torrentId === 'string' && torrentId.startsWith('magnet:')) {
+                        $torrentLink.href = torrentId;
+                        $torrentLink.textContent = torrent.name || displayName;
+                    } else if (typeof torrentId === 'string') {
+                        $torrentLink.href = torrentId;
+                        $torrentLink.textContent = displayName;
+                    } else {
+                        $torrentLink.href = '#';
+                        $torrentLink.textContent = displayName;
+                    }
+
+                    // Add torrent event listeners
+                    torrent.on('error', function(err) {
+                        debugLog(`Torrent error: ${err.message}`, 'error');
+                        alert(`Torrent error: ${err.message}`);
+                        closePlayer();
+                    });
+
+                    torrent.on('warning', function(err) {
+                        debugLog(`Torrent warning: ${err.message}`, 'warn');
+                    });
+
+                    // Find video file
+                    debugLog(`Searching for video files in torrent. Total files: ${torrent.files.length}`);
+                    
+                    // List all files for debugging
+                    torrent.files.forEach((file, index) => {
+                        debugLog(`File ${index}: ${file.name} (${prettyBytes(file.length)})`);
+                    });
+                    
+                    const videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.ogv', '.m4v', '.flv', '.wmv'];
+                    const file = torrent.files.find(function (file) {
+                        const hasVideoExt = videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+                        if (hasVideoExt) {
+                            debugLog(`Found video file: ${file.name} (${prettyBytes(file.length)})`);
+                        }
+                        return hasVideoExt;
+                    });
+
+                    if (!file) {
+                        const filesList = torrent.files.map(f => f.name).join('\n');
+                        debugLog(`No video file found. Available files: ${filesList}`, 'error');
+                        alert('No video file found in torrent.\n\nAvailable files:\n' + filesList);
+                        closePlayer();
+                        return;
+                    }
+
+                    debugLog(`Streaming video file: ${file.name} (${prettyBytes(file.length)})`, 'success');
+
+                    // Stream the file in the browser
+                    try {
+                        file.appendTo('#output');
+                        debugLog('Video element appended to output', 'success');
+                        
+                        // Wait a bit then check if video was created
+                        setTimeout(() => {
+                            const video = document.querySelector('#output video');
+                            if (video) {
+                                debugLog('Video element created successfully', 'success');
+                                video.controls = true;
+                                
+                                video.addEventListener('loadstart', () => debugLog('Video load started'));
+                                video.addEventListener('canplay', () => debugLog('Video can start playing', 'success'));
+                                video.addEventListener('error', (e) => debugLog(`Video error: ${e.message}`, 'error'));
+                            } else {
+                                debugLog('No video element found after appendTo', 'warn');
+                            }
+                        }, 1000);
+                        
+                    } catch (error) {
+                        debugLog(`Failed to append video: ${error.message}`, 'error');
+                        alert(`Failed to start video playback: ${error.message}`);
+                        closePlayer();
+                        return;
+                    }
+
+                    // Statistics
+                    torrent.on('done', onDone);
+                    const statsInterval = setInterval(onProgress, 500);
+                    onProgress();
+
+                    // Clear interval when torrent is destroyed
+                    torrent.on('close', function() {
+                        clearInterval(statsInterval);
+                    });
+
+                    function onProgress() {
+                        try {
+                            const $numPeers = document.querySelector('#numPeers');
+                            const $progressBar = document.querySelector('#progressBar');
+                            const $downloaded = document.querySelector('#downloaded');
+                            const $total = document.querySelector('#total');
+                            const $remaining = document.querySelector('#remaining');
+                            const $uploadSpeed = document.querySelector('#uploadSpeed');
+                            const $downloadSpeed = document.querySelector('#downloadSpeed');
+
+                            $numPeers.innerHTML = torrent.numPeers + (torrent.numPeers === 1 ? ' peer' : ' peers');
+
+                            const percent = Math.round(torrent.progress * 100 * 100) / 100;
+                            $progressBar.style.width = percent + '%';
+                            $downloaded.innerHTML = prettyBytes(torrent.downloaded);
+                            $total.innerHTML = prettyBytes(torrent.length);
+
+                            let remaining;
+                            if (torrent.done) {
+                                remaining = 'Done.';
+                            } else if (torrent.timeRemaining === Infinity) {
+                                remaining = 'Unknown time remaining.';
+                            } else {
+                                remaining = moment.duration(torrent.timeRemaining / 1000, 'seconds').humanize();
+                                remaining = remaining[0].toUpperCase() + remaining.substring(1) + ' remaining.';
+                            }
+                            $remaining.innerHTML = remaining;
+
+                            $downloadSpeed.innerHTML = prettyBytes(torrent.downloadSpeed) + '/s';
+                            $uploadSpeed.innerHTML = prettyBytes(torrent.uploadSpeed) + '/s';
+                        } catch (error) {
+                            debugLog(`Error updating progress: ${error.message}`, 'error');
+                        }
+                    }
+
+                    function onDone() {
+                        debugLog('Torrent download completed!', 'success');
+                        document.body.className += ' is-seed';
+                        onProgress();
+                    }
+                });
+
+            } catch (error) {
+                debugLog(`Failed to add torrent: ${error.message}`, 'error');
+                loadingIndicator.style.display = 'none';
+                alert(`Failed to load torrent: ${error.message}\n\nPlease check:\n1. The torrent file/link is valid\n2. You have internet access\n3. The file path is correct`);
+                closePlayer();
+            }
+        }
+
+        // Close player
+        function closePlayer() {
+            debugLog('Closing player...');
+            
+            const modal = document.getElementById('playerModal');
+            modal.classList.remove('active');
+            
+            if (currentTorrent) {
+                debugLog('Destroying current torrent');
+                currentTorrent.destroy();
+                currentTorrent = null;
+            }
+            
+            if (client) {
+                debugLog('Destroying WebTorrent client');
+                client.destroy();
+                client = null;
+            }
+            
+            // Remove is-seed class
+            document.body.className = document.body.className.replace(' is-seed', '');
+            
+            // Clear output
+            const output = document.getElementById('output');
+            const videos = output.querySelectorAll('video');
+            videos.forEach(video => video.remove());
+            
+            // Hide loading indicator
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            debugLog('Player closed', 'success');
+        }
+
+        // Human readable bytes util
+        function prettyBytes(num) {
+            const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const neg = num < 0;
+            if (neg) num = -
