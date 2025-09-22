@@ -324,9 +324,13 @@
             }
             
             try {
+                // Create unique player ID
+                const playerId = 'webtor-player-' + Date.now();
+                
                 // Create Webtor player container
                 const playerDiv = document.createElement('div');
-                playerDiv.className = 'webtor-player';
+                playerDiv.id = playerId;
+                playerDiv.className = 'webtor webtor-player';
                 playerDiv.style.width = '100%';
                 playerDiv.style.height = '100%';
                 playerDiv.style.position = 'absolute';
@@ -336,38 +340,43 @@
                 // Insert after the close button but before loading text
                 videoContainer.insertBefore(playerDiv, loadingVideo);
                 
-                // Wait for Webtor SDK to be available
-                const initWebtor = () => {
-                    if (typeof window.webtor !== 'undefined') {
-                        loadingVideo.textContent = 'Connecting to stream...';
-                        
-                        // Initialize Webtor player
-                        window.webtor(playerDiv, {
-                            magnet: magnetLink,
-                            width: '100%',
-                            height: '100%',
-                            poster: '',
-                            controls: true,
-                            autoplay: true,
-                            on: {
-                                ready: () => {
-                                    console.log('Webtor player ready');
-                                    loadingVideo.style.display = 'none';
-                                },
-                                error: (error) => {
-                                    console.error('Webtor error:', error);
-                                    loadingVideo.textContent = 'Error loading video. Please check the magnet link.';
-                                    loadingVideo.style.display = 'block';
-                                }
-                            }
-                        });
-                    } else {
-                        // Retry if Webtor SDK not loaded yet
-                        setTimeout(initWebtor, 100);
-                    }
-                };
+                // Initialize webtor array if it doesn't exist
+                window.webtor = window.webtor || [];
                 
-                initWebtor();
+                // Push configuration to webtor
+                window.webtor.push({
+                    id: playerId,
+                    magnet: magnetLink,
+                    width: '100%',
+                    height: '100%',
+                    poster: '',
+                    on: function(e) {
+                        console.log('Webtor event:', e.name, e.data);
+                        
+                        if (e.name === 'ready' || e.name === 'READY') {
+                            console.log('Webtor player ready');
+                            loadingVideo.style.display = 'none';
+                        }
+                        
+                        if (e.name === 'error' || e.name === 'ERROR' || e.name === 'TORRENT_ERROR') {
+                            console.error('Webtor error:', e.data);
+                            loadingVideo.textContent = 'Error loading video. Please check the magnet link.';
+                            loadingVideo.style.display = 'block';
+                        }
+                        
+                        if (e.name === 'TORRENT_FETCHED') {
+                            console.log('Torrent fetched successfully');
+                            loadingVideo.textContent = 'Loading video stream...';
+                        }
+                    }
+                });
+                
+                // Set timeout to hide loading if no events received
+                setTimeout(() => {
+                    if (loadingVideo.style.display !== 'none') {
+                        loadingVideo.textContent = 'Video player loaded. Click play to start.';
+                    }
+                }, 5000);
                 
             } catch (error) {
                 loadingVideo.textContent = 'Error: Unable to initialize video player';
