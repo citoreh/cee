@@ -309,7 +309,7 @@
             
             overlay.classList.add('active');
             loadingVideo.style.display = 'block';
-            loadingVideo.textContent = 'Loading video player...';
+            loadingVideo.textContent = 'Initializing Webtor player...';
             
             // Clear any existing content
             const existingPlayer = videoContainer.querySelector('.webtor-video-wrapper');
@@ -327,7 +327,7 @@
                 videoWrapper.style.top = '0';
                 videoWrapper.style.left = '0';
                 
-                // Create the video element with magnet link
+                // Create the video element exactly as in Webtor documentation
                 const videoElement = document.createElement('video');
                 videoElement.controls = true;
                 videoElement.src = magnetLink;
@@ -336,33 +336,79 @@
                 videoElement.style.backgroundColor = '#000';
                 videoElement.setAttribute('data-title', 'Video Stream');
                 
+                // Add poster for better UX (optional)
+                const posterUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgdmlld0JveD0iMCAwIDgwMCA0NTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNDUwIiBmaWxsPSIjMDAwIi8+Cjx0ZXh0IHg9IjQwMCIgeT0iMjI1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+TG9hZGluZyBWaWRlby4uLjwvdGV4dD4KPHN2Zz4K';
+                videoElement.poster = posterUrl;
+                
+                console.log('Creating video element with magnet:', magnetLink);
+                
                 // Add the video element to wrapper
                 videoWrapper.appendChild(videoElement);
                 
                 // Insert the wrapper into the container
                 videoContainer.insertBefore(videoWrapper, loadingVideo);
                 
-                // Hide loading after a short delay to let Webtor SDK process the video element
-                setTimeout(() => {
-                    loadingVideo.style.display = 'none';
-                    console.log('Video element created, Webtor SDK should replace it');
-                }, 2000);
+                // Wait a bit for Webtor SDK to detect and replace the video element
+                let checkInterval;
+                let attempts = 0;
+                const maxAttempts = 30; // 15 seconds total
+                
+                const checkWebtor = () => {
+                    attempts++;
+                    
+                    // Check if Webtor has replaced the video element with an iframe
+                    const iframe = videoWrapper.querySelector('iframe');
+                    const webplayerDiv = videoWrapper.querySelector('[data-webtor]') || 
+                                       videoWrapper.querySelector('.webtor-player') ||
+                                       document.querySelector('[src*="webtor"]');
+                    
+                    if (iframe || webplayerDiv) {
+                        console.log('Webtor player detected and loaded!');
+                        loadingVideo.style.display = 'none';
+                        clearInterval(checkInterval);
+                        
+                        // If it's an iframe, make sure it's properly sized
+                        if (iframe) {
+                            iframe.style.width = '100%';
+                            iframe.style.height = '100%';
+                            iframe.style.border = 'none';
+                        }
+                        
+                    } else if (attempts >= maxAttempts) {
+                        console.log('Webtor transformation timeout, showing fallback message');
+                        loadingVideo.textContent = 'Player loaded. The torrent may take a moment to start streaming.';
+                        clearInterval(checkInterval);
+                        
+                        // Still hide loading after showing message briefly
+                        setTimeout(() => {
+                            loadingVideo.style.display = 'none';
+                        }, 3000);
+                        
+                    } else {
+                        // Update loading message with progress
+                        const dots = '.'.repeat((attempts % 4));
+                        loadingVideo.textContent = `Connecting to torrent network${dots}`;
+                        console.log(`Webtor check attempt ${attempts}/${maxAttempts}`);
+                    }
+                };
+                
+                // Start checking for Webtor transformation
+                checkInterval = setInterval(checkWebtor, 500);
+                
+                // Initial check after a short delay
+                setTimeout(checkWebtor, 1000);
                 
                 // Add event listeners for debugging
                 videoElement.addEventListener('loadstart', () => {
                     console.log('Video loadstart event');
-                    loadingVideo.textContent = 'Connecting to stream...';
-                });
-                
-                videoElement.addEventListener('canplay', () => {
-                    console.log('Video canplay event');
-                    loadingVideo.style.display = 'none';
                 });
                 
                 videoElement.addEventListener('error', (e) => {
-                    console.error('Video error event:', e);
-                    loadingVideo.textContent = 'Webtor is processing the magnet link...';
-                    loadingVideo.style.display = 'block';
+                    console.log('Video error event (this is normal - Webtor will replace it):', e);
+                });
+                
+                videoElement.addEventListener('play', () => {
+                    console.log('Video play event');
                 });
                 
             } catch (error) {
