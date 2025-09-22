@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Media Index - Photos & Torrents</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #30a247;
+            margin-bottom: 10px;
+        }
+
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .media-item {
+            background-color: #2a3749;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .media-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(48, 162, 71, 0.3);
+        }
+
+        .media-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .media-info {
+            padding: 15px;
+        }
+
+        .media-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .media-status {
+            font-size: 12px;
+            color: #30a247;
+        }
+
+        /* Player Modal */
+        .player-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+        }
+
+        .player-modal.active {
+            display: block;
+        }
+
+        .player-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 1200px;
+            background-color: #2a3749;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .player-header {
+            background-color: #154820;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .player-content {
+            padding: 0;
+        }
+
+        /* Player styles from original */
+        #output video {
+            width: 100%;
+        }
+
+        #progressBar {
+            height: 5px;
+            width: 0%;
+            background-color: #35b44f;
+            transition: width .4s ease-in-out;
+        }
+
+        body.is-seed .show-seed {
+            display: inline;
+        }
+
+        body.is-seed .show-leech {
+            display: none;
+        }
+
+        .show-seed {
+            display: none;
+        }
+
+        #status code {
+            font-size: 90%;
+            font-weight: 700;
+            margin-left: 3px;
+            margin-right: 3px;
+            border-bottom: 1px dashed rgba(255,255,255,0.3);
+        }
+
+        #status {
+            color: #fff;
+            font-size: 17px;
+            padding: 5px;
+        }
+
+        a:link, a:visited {
+            color: #30a247;
+            text-decoration: none;
+        }
+
+        .no-files {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+            margin-top: 50px;
+        }
+
+        .no-files ol {
+            color: #ccc;
+            font-style: normal;
+        }
+
+        .no-files code {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #30a247;
+        }
+
+        .loading {
+            text-align: center;
+            color: #30a247;
+            font-size: 18px;
+            grid-column: 1/-1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Media Library</h1>
+        <p>Click on any photo to stream the corresponding torrent file</p>
+    </div>
+
+    <div class="media-grid" id="mediaGrid">
+        <!-- Media items will be populated here -->
+    </div>
+
+    <div class="no-files" id="noFiles" style="display: none;">
+        <h3>No media files found</h3>
+        <p>Add your photo and torrent files to the media folder and update the mediaFiles array in the script.</p>
+    </div>
+
+    <!-- Player Modal -->
+    <div class="player-modal" id="playerModal">
+        <div class="player-container">
+            <div class="player-header">
+                <h3 id="playerTitle">Streaming...</h3>
+                <button class="close-btn" onclick="closePlayer()">&times;</button>
+            </div>
+            <div class="player-content">
+                <div id="output">
+                    <div id="progressBar"></div>
+                    <!-- The video player will be added here -->
+                </div>
+                <!-- Statistics -->
+                <div id="status">
+                    <div>
+                        <span class="show-leech">Downloading </span>
+                        <span class="show-seed">Seeding </span>
+                        <code>
+                            <a id="torrentLink" href="#">loading...</a>
+                        </code>
+                        <span class="show-leech"> from </span>
+                        <span class="show-seed"> to </span>
+                        <code id="numPeers">0 peers</code>.
+                    </div>
+                    <div>
+                        <code id="downloaded"></code>
+                        of <code id="total"></code>
+                        — <span id="remaining"></span><br/>
+                        &#x2198;<code id="downloadSpeed">0 b/s</code>
+                        / &#x2197;<code id="uploadSpeed">0 b/s</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include WebTorrent -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <!-- Moment for time formatting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+    <script>
+        const mediaFolder = 'media/'; // Adjust path as needed
+        let currentTorrent = null;
+        let client = null;
+        let mediaFiles = [];
+
+        // Auto-discover media files
+        async function discoverMediaFiles() {
+            try {
+                // Try to get directory listing via fetch
+                const response = await fetch(mediaFolder);
+                const html = await response.text();
+                
+                // Parse HTML for file links (works with basic directory listings)
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const links = Array.from(doc.querySelectorAll('a[href]'));
+                
+                const files = links
+                    .map(link => link.href.split('/').pop())
+                    .filter(filename => filename && !filename.includes('..'))
+                    .filter(filename => filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.png'));
+                
+                return files.map(filename => filename.replace(/\.(jpg|jpeg|png)$/i, ''));
+            } catch (error) {
+                console.warn('Could not auto-discover files via directory listing:', error);
+                return await tryFileSystemAPI();
+            }
+        }
+
+        // Alternative method using File System API (if available)
+        async function tryFileSystemAPI() {
+            try {
+                if ('showDirectoryPicker' in window) {
+                    // This would require user interaction to select directory
+                    console.log('File System Access API available but requires user interaction');
+                }
+                return await tryCommonFiles();
+            } catch (error) {
+                console.warn('File System API not available:', error);
+                return await tryCommonFiles();
+            }
+        }
+
+        // Fallback: Try common file names
+        async function tryCommonFiles() {
+            const commonNames = [
+                'movie1', 'movie2', 'movie3', 'movie4', 'movie5',
+                'film1', 'film2', 'film3', 'film4', 'film5',
+                'video1', 'video2', 'video3', 'video4', 'video5',
+                'episode1', 'episode2', 'episode3', 'episode4', 'episode5',
+                'show1', 'show2', 'show3', 'show4', 'show5',
+                'sintel', 'big_buck_bunny', 'tears_of_steel'
+            ];
+
+            const validFiles = [];
+            
+            for (const name of commonNames) {
+                try {
+                    // Check if both image and torrent exist
+                    const imgResponse = await fetch(`${mediaFolder}${name}.jpg`, { method: 'HEAD' });
+                    const torrentResponse = await fetch(`${mediaFolder}${name}.torrent`, { method: 'HEAD' });
+                    
+                    if (imgResponse.ok && torrentResponse.ok) {
+                        validFiles.push(name);
+                    }
+                } catch (e) {
+                    // File doesn't exist, continue
+                    continue;
+                }
+            }
+            
+            return validFiles;
+        }
+
+        // Initialize the media grid
+        async function initializeMediaGrid() {
+            const grid = document.getElementById('mediaGrid');
+            const noFiles = document.getElementById('noFiles');
+            
+            // Show loading message
+            grid.innerHTML = '<div style="text-align: center; color: #888; grid-column: 1/-1;">Scanning for media files...</div>';
+
+            try {
+                mediaFiles = await discoverMediaFiles();
+                grid.innerHTML = ''; // Clear loading message
+
+                if (mediaFiles.length === 0) {
+                    noFiles.style.display = 'block';
+                    showManualInstructions();
+                    return;
+                }
+
+                mediaFiles.forEach(fileName => {
+                    const mediaItem = createMediaItem(fileName);
+                    grid.appendChild(mediaItem);
+                });
+                
+                console.log(`Found ${mediaFiles.length} media file(s):`, mediaFiles);
+            } catch (error) {
+                console.error('Error discovering media files:', error);
+                grid.innerHTML = '';
+                noFiles.style.display = 'block';
+                showManualInstructions();
+            }
+        }
+
+        // Show manual file management interface
+        function showManualInstructions() {
+            const noFiles = document.getElementById('noFiles');
+            noFiles.innerHTML = `
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <h3>Manual File Management</h3>
+                    <p>Add your media files to the list below:</p>
+                    
+                    <div style="background: #2a3749; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h4>Add New Media Item:</h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                            <input type="text" id="newFileName" placeholder="Enter filename (without extension)" 
+                                   style="flex: 1; min-width: 200px; padding: 8px; border: 1px solid #555; background: #1a1a1a; color: #fff; border-radius: 4px;">
+                            <button onclick="addMediaFile()" style="padding: 8px 16px; background: #30a247; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                                Add File
+                            </button>
+                        </div>
+                        <small style="color: #888;">This will look for: filename.jpg and filename.torrent in your media folder</small>
+                    </div>
+
+                    <div style="background: #2a3749; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h4>Bulk Add from Text:</h4>
+                        <textarea id="bulkFiles" placeholder="Enter filenames, one per line" 
+                                  style="width: 100%; height: 100px; padding: 8px; border: 1px solid #555; background: #1a1a1a; color: #fff; border-radius: 4px; resize: vertical;"></textarea>
+                        <button onclick="addBulkFiles()" style="margin-top: 10px; padding: 8px 16px; background: #30a247; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                            Add All Files
+                        </button>
+                    </div>
+
+                    <div style="background: #2a3749; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h4>File System Picker (Modern Browsers):</h4>
+                        <button onclick="manualDiscovery()" style="padding: 10px 20px; background: #30a247; border: none; color: white; border-radius: 5px; cursor: pointer;">
+                            Select Media Folder
+                        </button>
+                        <br><small style="color: #888;">Works in Chrome/Edge with HTTPS</small>
+                    </div>
+
+                    <div style="background: #154820; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h4>Current Media Files (<span id="fileCount">0</span>):</h4>
+                        <div id="fileList" style="color: #ccc;"></div>
+                        <button onclick="clearAllFiles()" style="margin-top: 10px; padding: 6px 12px; background: #d32f2f; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            updateFileList();
+        }
+
+        // Add a single media file
+        function addMediaFile() {
+            const input = document.getElementById('newFileName');
+            const fileName = input.value.trim();
+            
+            if (!fileName) {
+                alert('Please enter a filename');
+                return;
+            }
+            
+            if (mediaFiles.includes(fileName)) {
+                alert('File already exists in the list');
+                return;
+            }
+            
+            mediaFiles.push(fileName);
+            input.value = '';
+            updateFileList();
+            refreshMediaGrid();
+        }
+
+        // Add multiple files from textarea
+        function addBulkFiles() {
+            const textarea = document.getElementById('bulkFiles');
+            const files = textarea.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !mediaFiles.includes(line));
+            
+            if (files.length === 0) {
+                alert('No new files to add');
+                return;
+            }
+            
+            mediaFiles.push(...files);
+            textarea.value = '';
+            updateFileList();
+            refreshMediaGrid();
+        }
+
+        // Clear all files
+        function clearAllFiles() {
+            if (confirm('Are you sure you want to clear all media files?')) {
+                mediaFiles = [];
+                updateFileList();
+                refreshMediaGrid();
+            }
+        }
+
+        // Update the file list display
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            const fileCount = document.getElementById('fileCount');
+            
+            if (!fileList || !fileCount) return;
+            
+            fileCount.textContent = mediaFiles.length;
+            
+            if (mediaFiles.length === 0) {
+                fileList.innerHTML = '<em>No files added yet</em>';
+            } else {
+                fileList.innerHTML = mediaFiles.map(file => 
+                    `<div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #333;">
+                        <span>${file}</span>
+                        <button onclick="removeFile('${file}')" style="padding: 2px 6px; background: #d32f2f; border: none; color: white; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                            Remove
+                        </button>
+                    </div>`
+                ).join('');
+            }
+        }
+
+        // Remove a specific file
+        function removeFile(fileName) {
+            mediaFiles = mediaFiles.filter(file => file !== fileName);
+            updateFileList();
+            refreshMediaGrid();
+        }
+
+        // Refresh the media grid
+        function refreshMediaGrid() {
+            const grid = document.getElementById('mediaGrid');
+            const noFiles = document.getElementById('noFiles');
+            
+            grid.innerHTML = '';
+            
+            if (mediaFiles.length === 0) {
+                noFiles.style.display = 'block';
+            } else {
+                noFiles.style.display = 'none';
+                mediaFiles.forEach(fileName => {
+                    const mediaItem = createMediaItem(fileName);
+                    grid.appendChild(mediaItem);
+                });
+            }
+        }
+
+        // Handle Enter key in filename input
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const input = document.getElementById('newFileName');
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            addMediaFile();
+                        }
+                    });
+                }
+            }, 100);
+        });
+
+        // Manual file picker option
+        async function manualDiscovery() {
+            try {
+                if ('showDirectoryPicker' in window) {
+                    const directoryHandle = await window.showDirectoryPicker();
+                    const files = [];
+                    
+                    for await (const entry of directoryHandle.values()) {
+                        if (entry.kind === 'file' && entry.name.match(/\.(jpg|jpeg|png)$/i)) {
+                            const baseName = entry.name.replace(/\.(jpg|jpeg|png)$/i, '');
+                            
+                            // Check if corresponding torrent exists
+                            try {
+                                await directoryHandle.getFileHandle(`${baseName}.torrent`);
+                                files.push(baseName);
+                            } catch (e) {
+                                // No matching torrent file
+                            }
+                        }
+                    }
+                    
+                    if (files.length > 0) {
+                        mediaFiles = files;
+                        const grid = document.getElementById('mediaGrid');
+                        const noFiles = document.getElementById('noFiles');
+                        
+                        grid.innerHTML = '';
+                        noFiles.style.display = 'none';
+                        
+                        mediaFiles.forEach(fileName => {
+                            const mediaItem = createMediaItem(fileName);
+                            grid.appendChild(mediaItem);
+                        });
+                        
+                        console.log(`Manually selected ${mediaFiles.length} media file(s):`, mediaFiles);
+                    } else {
+                        alert('No matching image/torrent pairs found in selected directory');
+                    }
+                } else {
+                    alert('File System Access API not supported in this browser. Please use Chrome/Edge and ensure HTTPS.');
+                }
+            } catch (error) {
+                console.error('Manual directory selection failed:', error);
+                alert('Directory selection was cancelled or failed');
+            }
+        }
+
+        // Create media item element
+        function createMediaItem(fileName) {
+            const item = document.createElement('div');
+            item.className = 'media-item';
+            item.onclick = () => playTorrent(fileName);
+
+            const photoPath = `${mediaFolder}${fileName}.jpg`;
+            const torrentPath = `${mediaFolder}${fileName}.torrent`;
+
+            item.innerHTML = `
+                <img src="${photoPath}" alt="${fileName}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNDQ0Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="media-info">
+                    <div class="media-title">${fileName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                    <div class="media-status">Click to stream</div>
+                </div>
+            `;
+
+            return item;
+        }
+
+        // Play torrent function
+        function playTorrent(fileName) {
+            const torrentPath = `${mediaFolder}${fileName}.torrent`;
+            const modal = document.getElementById('playerModal');
+            const title = document.getElementById('playerTitle');
+            
+            title.textContent = `Streaming: ${fileName.replace(/_/g, ' ')}`;
+            modal.classList.add('active');
+            
+            // Clean up previous torrent
+            if (currentTorrent) {
+                currentTorrent.destroy();
+                currentTorrent = null;
+            }
+            
+            if (client) {
+                client.destroy();
+            }
+            
+            // Clear output
+            const output = document.getElementById('output');
+            const videos = output.querySelectorAll('video');
+            videos.forEach(video => video.remove());
+            
+            // Reset progress bar
+            document.getElementById('progressBar').style.width = '0%';
+            
+            // Initialize WebTorrent client
+            client = new WebTorrent();
+            
+            // Start torrent
+            startTorrentStream(torrentPath, fileName);
+        }
+
+        // Start torrent streaming (from original code)
+        function startTorrentStream(torrentPath, fileName) {
+            const $body = document.body;
+            const $progressBar = document.querySelector('#progressBar');
+            const $numPeers = document.querySelector('#numPeers');
+            const $downloaded = document.querySelector('#downloaded');
+            const $total = document.querySelector('#total');
+            const $remaining = document.querySelector('#remaining');
+            const $uploadSpeed = document.querySelector('#uploadSpeed');
+            const $downloadSpeed = document.querySelector('#downloadSpeed');
+            const $torrentLink = document.querySelector('#torrentLink');
+
+            $torrentLink.href = torrentPath;
+            $torrentLink.textContent = fileName + '.torrent';
+
+            // Download the torrent
+            client.add(torrentPath, function (torrent) {
+                currentTorrent = torrent;
+
+                // Find video file
+                const file = torrent.files.find(function (file) {
+                    return file.name.endsWith('.mp4') || file.name.endsWith('.mkv') || 
+                           file.name.endsWith('.avi') || file.name.endsWith('.mov') ||
+                           file.name.endsWith('.webm');
+                });
+
+                if (!file) {
+                    alert('No video file found in torrent');
+                    closePlayer();
+                    return;
+                }
+
+                // Stream the file in the browser
+                file.appendTo('#output');
+
+                // Statistics
+                torrent.on('done', onDone);
+                setInterval(onProgress, 500);
+                onProgress();
+
+                function onProgress() {
+                    $numPeers.innerHTML = torrent.numPeers + (torrent.numPeers === 1 ? ' peer' : ' peers');
+
+                    const percent = Math.round(torrent.progress * 100 * 100) / 100;
+                    $progressBar.style.width = percent + '%';
+                    $downloaded.innerHTML = prettyBytes(torrent.downloaded);
+                    $total.innerHTML = prettyBytes(torrent.length);
+
+                    let remaining;
+                    if (torrent.done) {
+                        remaining = 'Done.';
+                    } else {
+                        remaining = moment.duration(torrent.timeRemaining / 1000, 'seconds').humanize();
+                        remaining = remaining[0].toUpperCase() + remaining.substring(1) + ' remaining.';
+                    }
+                    $remaining.innerHTML = remaining;
+
+                    $downloadSpeed.innerHTML = prettyBytes(torrent.downloadSpeed) + '/s';
+                    $uploadSpeed.innerHTML = prettyBytes(torrent.uploadSpeed) + '/s';
+                }
+
+                function onDone() {
+                    $body.className += ' is-seed';
+                    onProgress();
+                }
+            });
+        }
+
+        // Close player
+        function closePlayer() {
+            const modal = document.getElementById('playerModal');
+            modal.classList.remove('active');
+            
+            if (currentTorrent) {
+                currentTorrent.destroy();
+                currentTorrent = null;
+            }
+            
+            if (client) {
+                client.destroy();
+                client = null;
+            }
+            
+            // Remove is-seed class
+            document.body.className = document.body.className.replace(' is-seed', '');
+            
+            // Clear output
+            const output = document.getElementById('output');
+            const videos = output.querySelectorAll('video');
+            videos.forEach(video => video.remove());
+        }
+
+        // Human readable bytes util
+        function prettyBytes(num) {
+            const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const neg = num < 0;
+            if (neg) num = -num;
+            if (num < 1) return (neg ? '-' : '') + num + ' B';
+            const exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1);
+            const unit = units[exponent];
+            num = Number((num / Math.pow(1000, exponent)).toFixed(2));
+            return (neg ? '-' : '') + num + ' ' + unit;
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('playerModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePlayer();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closePlayer();
+            }
+        });
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeMediaGrid);
+    </script>
+</body>
+</html>
